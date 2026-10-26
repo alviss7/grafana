@@ -1442,9 +1442,28 @@
     },
     "gma-rule-list": {
       "alert-rules": {
+        "folders-error": "Failed to load folders",
+        "loading-folders": "Loading folders...",
+        "next": "Next",
+        "no-folders": "No folders found",
         "no-rules": "No alert rules found",
+        "no-rules-in-folder": "No alert rules in this folder",
+        "no-rules-match-folder": "No alert rules match this folder",
+        "previous": "Previous",
         "rules-error": "Failed to load rules",
         "search-issues": "Change the search to see results"
+      },
+      "folder-row": {
+        "alert-rule-count_one": "{{count}} alert rule",
+        "alert-rule-count_other": "{{count}} alert rules",
+        "collapse": "Collapse {{title}}",
+        "count-retry": "Retry",
+        "count-retry-label": "Retry loading the rule count of {{title}}",
+        "count-tooltip": "Rules directly in this folder. Subfolders are listed separately.",
+        "count-unavailable": "Count unavailable",
+        "expand": "Expand {{title}}",
+        "recording-rule-count_one": "{{count}} recording rule",
+        "recording-rule-count_other": "{{count}} recording rules"
       },
       "interval": "Evaluated every {{interval}}",
       "recording-rules": {
@@ -1459,6 +1478,7 @@
       },
       "search": {
         "default-policy-unavailable": "Filtering by the default policy isn't available yet.",
+        "folders-disabled": "Clear filters to browse by folder",
         "help": {
           "contact-point": "Direct contact point (mutually exclusive with policy:).",
           "dashboard": "Dashboard the rule is linked to (canonical value is the dashboard UID).",
@@ -1507,6 +1527,8 @@
         "renamed-value": "Use {{to}} instead of {{from}}.",
         "unavailable-tokens": "Some filters are not available yet: {{tokens}}",
         "unclosed-quote": "A quote in the search is not closed.",
+        "view-folders": "Folders",
+        "view-list": "List",
         "wildcard-in-text": "Search text cannot contain * or %."
       },
       "shared": {

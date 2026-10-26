@@ -14,7 +14,8 @@ export function RuleListSkeleton() {
   );
 }
 
-function RuleListItemSkeletons() {
+/** Skeleton rows for a list that already has its own `<ul>`, such as an expanded folder. */
+export function RuleListItemSkeletons() {
   return Array.from({ length: SKELETON_ROWS }, (_, index) => (
     <RuleListItem
       key={index}

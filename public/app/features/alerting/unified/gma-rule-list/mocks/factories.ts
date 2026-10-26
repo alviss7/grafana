@@ -1,5 +1,13 @@
 import { type RuleKind } from '../shared/ruleKind';
 
+/** One item of a folder search response. */
+export function folderItem(uid: string, title: string) {
+  return {
+    resource: { group: 'folder.grafana.app', kind: 'Folder', name: uid, resource: 'folders' },
+    fields: { title },
+  };
+}
+
 /** One item of a rule search response. */
 export function ruleItem(kind: RuleKind, uid: string, title: string, folder: string) {
   return {

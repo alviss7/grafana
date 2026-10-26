@@ -5,8 +5,17 @@ import { locationService, reportInteraction } from '@grafana/runtime';
 import server from '@grafana/test-utils/server';
 
 import { setupMswServer } from '../../mockApi';
-import { ruleItem } from '../mocks/factories';
-import { mockFolderParents, mockRuleSearch, ruleSearchUrl } from '../mocks/handlers';
+import { folderItem, ruleItem } from '../mocks/factories';
+import {
+  FOLDER_COUNTS_URL,
+  FOLDER_SEARCH_URL,
+  type SearchRequestBody,
+  mockFolderCounts,
+  mockFolderParents,
+  mockFolderSearch,
+  mockRuleSearch,
+  ruleSearchUrl,
+} from '../mocks/handlers';
 
 import AlertRulesPage from './AlertRulesPage';
 
@@ -54,6 +63,11 @@ function failFirstCall(url: string, ok: object) {
   return () => calls;
 }
 
+/** Folders is the default view; List tests open the page with `view=list`. */
+function renderInListMode() {
+  return render(<AlertRulesPage />, { historyOptions: { initialEntries: ['/?view=list'] } });
+}
+
 function secondPage() {
   return HttpResponse.json({ items: [ruleItem('alert', 'rule-2', 'Disk full', 'folder-2')], metadata: {} });
 }
@@ -73,7 +87,7 @@ describe('AlertRulesPage', () => {
       metadata: {},
     }));
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     const rows = await screen.findAllByRole('listitem');
     expect(rows.map((row) => row.querySelector('a')?.textContent)).toEqual(['CPU high', 'Disk full']);
@@ -88,7 +102,7 @@ describe('AlertRulesPage', () => {
       return { items: [ruleItem('alert', 'rule-1', 'CPU high', 'folder-1')], metadata: {} };
     });
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     expect(await screen.findByText('CPU high')).toBeInTheDocument();
     expect(body).toMatchObject({ kind: 'SearchQuery', sort: [{ field: 'title', direction: 'asc' }], limit: 40 });
@@ -101,7 +115,7 @@ describe('AlertRulesPage', () => {
       metadata: { totalHits: 154, totalHitsRelation: 'eq' },
     }));
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     expect(await screen.findByText('154 alert rules')).toBeInTheDocument();
   });
@@ -118,7 +132,7 @@ describe('AlertRulesPage', () => {
       })
     );
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     expect(await screen.findByRole('list', { name: 'Loading rules' })).toHaveAttribute('aria-busy', 'true');
     releasePage();
@@ -129,7 +143,7 @@ describe('AlertRulesPage', () => {
   it('shows the empty state after a successful empty response', async () => {
     mockRuleSearch('alert', () => ({ items: [], metadata: {} }));
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     expect(await screen.findByText('No alert rules found')).toBeInTheDocument();
   });
@@ -140,7 +154,7 @@ describe('AlertRulesPage', () => {
       metadata: {},
     });
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load rules');
     expect(screen.queryByText('No alert rules found')).not.toBeInTheDocument();
@@ -181,7 +195,7 @@ describe('AlertRulesPage', () => {
       })
     );
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Load more' }));
     await screen.findByText('Disk full');
@@ -217,7 +231,7 @@ describe('AlertRulesPage', () => {
       })
     );
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Load more' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -236,7 +250,7 @@ describe('AlertRulesPage', () => {
       return secondPage();
     });
 
-    render(<AlertRulesPage />);
+    renderInListMode();
 
     await screen.findByText('CPU high');
     await userEvent.dblClick(screen.getByRole('button', { name: 'Load more' }));
@@ -253,7 +267,7 @@ describe('AlertRulesPage', () => {
     const pageViewCalls = () =>
       reportInteractionMock.mock.calls.filter(([event]) => event === 'grafana_alerting_gma_rule_list_view');
 
-    const { rerender } = render(<AlertRulesPage />);
+    const { rerender } = renderInListMode();
     await screen.findByText('No alert rules found');
     expect(pageViewCalls()).toEqual([['grafana_alerting_gma_rule_list_view', { kind: 'alert', mode: 'list' }]]);
 
@@ -285,7 +299,7 @@ describe('AlertRulesPage search', () => {
   });
 
   it('keeps a multi-token query exactly as typed in the input and the URL, and sends it as one request', async () => {
-    const { user } = render(<AlertRulesPage />);
+    const { user } = renderInListMode();
     await screen.findByText('CPU high');
     const typed = 'paused:true cpu label:team=api  folder:folder-1';
 
@@ -325,7 +339,7 @@ describe('AlertRulesPage search', () => {
   });
 
   it('searches titles for a key:value word the page has no filter for, and keeps it as typed in the URL', async () => {
-    const { user } = render(<AlertRulesPage />);
+    const { user } = renderInListMode();
     await screen.findByText('CPU high');
 
     await user.type(searchInput(), 'foo:bar metric:cpu{Enter}');
@@ -358,7 +372,7 @@ describe('AlertRulesPage search', () => {
   });
 
   it('sends no request for an invalid query typed into the input, and searches again once it is fixed', async () => {
-    const { user } = render(<AlertRulesPage />);
+    const { user } = renderInListMode();
     await screen.findByText('CPU high');
 
     await user.type(searchInput(), 'panelId:4{Enter}');
@@ -418,7 +432,7 @@ describe('AlertRulesPage search', () => {
         });
       })
     );
-    const { user } = render(<AlertRulesPage />);
+    const { user } = renderInListMode();
     await user.click(await screen.findByRole('button', { name: 'Load more' }));
     expect(await screen.findByText('Disk full')).toBeInTheDocument();
 
@@ -430,24 +444,24 @@ describe('AlertRulesPage search', () => {
     expect(ruleSearchBodies.map((body) => body.continue ?? null)).toEqual([null, 'tok', null]);
   });
 
-  it('clearing the input with the clear button searches again without a filter', async () => {
-    const { user } = render(<AlertRulesPage />);
+  it('clearing the input with the clear button returns to Folders mode', async () => {
+    mockFolderSearch(() => ({ items: [folderItem('folder-1', 'Team Alerts')], metadata: {} }));
+    mockFolderCounts('alert', { 'folder-1': 1 });
+    const { user } = renderInListMode();
     await screen.findByText('CPU high');
     await user.type(searchInput(), 'cpu{Enter}');
     await waitFor(() => expect(ruleSearchBodies.at(-1)?.where).toEqual({ text: { value: 'cpu' } }));
 
-    const requestsBeforeClear = ruleSearchBodies.length;
-
     await user.click(screen.getByRole('button', { name: 'Clear' }));
 
-    await waitFor(() => expect(ruleSearchBodies).toHaveLength(requestsBeforeClear + 1));
-    expect(ruleSearchBodies.at(-1)?.where).toBeUndefined();
+    expect(await screen.findByRole('button', { name: 'Expand Team Alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Folders' })).toBeChecked();
     expect(searchParam()).toBe('');
     expect(searchInput()).toHaveValue('');
   });
 
   it('Back and Forward restore the input and the request for each applied query', async () => {
-    const { user } = render(<AlertRulesPage />);
+    const { user } = renderInListMode();
     await screen.findByText('CPU high');
     await user.type(searchInput(), 'cpu{Enter}');
     await waitFor(() => expect(searchParam()).toBe('cpu'));
@@ -472,5 +486,248 @@ describe('AlertRulesPage search', () => {
         ],
       })
     );
+  });
+});
+
+describe('AlertRulesPage Folders mode', () => {
+  let ruleSearchBodies: SearchRequestBody[];
+
+  beforeEach(() => {
+    reportInteractionMock.mockClear();
+    mockFolderParents({ 'folder-1': 'Team Alerts', 'folder-2': 'Infra' });
+    mockFolderCounts('alert', { 'folder-1': 3, 'folder-2': 0 });
+    ruleSearchBodies = [];
+    mockRuleSearch('alert', (body) => {
+      ruleSearchBodies.push(body);
+      return { items: [ruleItem('alert', 'rule-1', 'CPU high', 'folder-1')], metadata: {} };
+    });
+  });
+
+  function viewParam() {
+    return new URLSearchParams(locationService.getLocation().search).get('view');
+  }
+
+  it('opens in Folders mode with collapsed folders in title order, each with its direct Alert-rule count', async () => {
+    let body: unknown;
+    mockFolderSearch((received) => {
+      body = received;
+      return { items: [folderItem('folder-2', 'Infra'), folderItem('folder-1', 'Team Alerts')], metadata: {} };
+    });
+
+    render(<AlertRulesPage />);
+
+    expect(await screen.findByRole('link', { name: 'Team Alerts' })).toHaveAttribute(
+      'href',
+      '/dashboards/f/folder-1/team-alerts/alerting'
+    );
+    const titles = screen.getAllByRole('link').map((link) => link.textContent);
+    expect(titles).toEqual(['Infra', 'Team Alerts']);
+    expect(await screen.findByText('3 alert rules')).toBeInTheDocument();
+    expect(await screen.findByText('0 alert rules')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand Team Alerts' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('radio', { name: 'Folders' })).toBeChecked();
+    expect(body).toMatchObject({
+      labelSelector: { matchLabels: { 'alerting.grafana.app/has-rules': 'true' } },
+      sort: [{ field: 'title', direction: 'asc' }],
+      limit: 40,
+    });
+    expect(body).not.toHaveProperty('where');
+    expect(ruleSearchBodies).toEqual([]);
+    expect(reportInteractionMock).toHaveBeenCalledWith('grafana_alerting_gma_rule_list_view', {
+      kind: 'alert',
+      mode: 'folders',
+    });
+  });
+
+  it('scopes the folder listing to a folder filter and stays in Folders mode', async () => {
+    let where: unknown;
+    mockFolderSearch((received) => {
+      where = received.where;
+      return { items: [folderItem('folder-1', 'Team Alerts')], metadata: {} };
+    });
+
+    render(<AlertRulesPage />, { historyOptions: { initialEntries: ['/?search=folder%3Afolder-1'] } });
+
+    expect(await screen.findByRole('link', { name: 'Team Alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Folders' })).toBeChecked();
+    expect(where).toEqual({ filter: { field: 'name', operator: 'In', values: ['folder-1'] } });
+    expect(ruleSearchBodies).toEqual([]);
+  });
+
+  it('loads only the expanded folder rules, without a folder path on their rows', async () => {
+    mockFolderSearch(() => ({
+      items: [folderItem('folder-1', 'Team Alerts'), folderItem('folder-2', 'Infra')],
+      metadata: {},
+    }));
+    const { user } = render(<AlertRulesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Expand Team Alerts' }));
+
+    const ruleLink = await screen.findByRole('link', { name: 'CPU high' });
+    expect(ruleSearchBodies.map((body) => body.where)).toEqual([
+      { filter: { field: 'folder', operator: 'In', values: ['folder-1'] } },
+    ]);
+    // The folder row already names the folder, so the rule row has no path of its own.
+    expect(ruleLink.closest('li')).not.toHaveTextContent('Team Alerts');
+
+    await user.click(screen.getByRole('button', { name: 'Collapse Team Alerts' }));
+
+    expect(screen.queryByRole('link', { name: 'CPU high' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a separate Load more for each expanded folder', async () => {
+    mockFolderSearch(() => ({
+      items: [folderItem('folder-1', 'Team Alerts'), folderItem('folder-2', 'Infra')],
+      metadata: {},
+    }));
+    server.use(
+      http.post(ruleSearchUrl('alert'), async ({ request }) => {
+        const body = (await request.json()) as { where?: { filter?: { values?: string[] } }; continue?: string };
+        ruleSearchBodies.push(body);
+        if (body.where?.filter?.values?.[0] === 'folder-2') {
+          return HttpResponse.json({ items: [ruleItem('alert', 'rule-9', 'Latency', 'folder-2')], metadata: {} });
+        }
+        return body.continue
+          ? HttpResponse.json({ items: [ruleItem('alert', 'rule-2', 'Disk full', 'folder-1')], metadata: {} })
+          : HttpResponse.json({
+              items: [ruleItem('alert', 'rule-1', 'CPU high', 'folder-1')],
+              metadata: { continue: 'tok' },
+            });
+      })
+    );
+    const { user } = render(<AlertRulesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Expand Team Alerts' }));
+    await user.click(screen.getByRole('button', { name: 'Expand Infra' }));
+    expect(await screen.findByText('Latency')).toBeInTheDocument();
+    expect(await screen.findByText('CPU high')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Disk full')).toBeInTheDocument();
+    expect(screen.getByText('Latency')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    expect(ruleSearchBodies.filter((body) => body.continue)).toHaveLength(1);
+  });
+
+  it('pages through folders with Next and returns with Previous without searching again', async () => {
+    const continuations: Array<string | null> = [];
+    mockFolderSearch((body) => {
+      continuations.push(body.continue ?? null);
+      return body.continue
+        ? { items: [folderItem('folder-2', 'Infra')], metadata: {} }
+        : { items: [folderItem('folder-1', 'Team Alerts')], metadata: { continue: 'tok' } };
+    });
+    const { user } = render(<AlertRulesPage />);
+
+    expect(await screen.findByRole('link', { name: 'Team Alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByRole('link', { name: 'Infra' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Team Alerts' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
+
+    expect(await screen.findByRole('link', { name: 'Team Alerts' })).toBeInTheDocument();
+    expect(continuations).toEqual([null, 'tok']);
+  });
+
+  it('keeps the shown folders when Next fails, and loads the page after Retry', async () => {
+    let failNext = true;
+    server.use(
+      http.post(FOLDER_SEARCH_URL, async ({ request }) => {
+        const { continue: token } = (await request.json()) as { continue?: string };
+        if (!token) {
+          return HttpResponse.json({ items: [folderItem('folder-1', 'Team Alerts')], metadata: { continue: 'tok' } });
+        }
+        if (failNext) {
+          failNext = false;
+          return HttpResponse.json({ message: 'expired' }, { status: 410 });
+        }
+        return HttpResponse.json({ items: [folderItem('folder-2', 'Infra')], metadata: {} });
+      })
+    );
+    const { user } = render(<AlertRulesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByText('Failed to load more results')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Team Alerts' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByText('Failed to load more results')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByRole('link', { name: 'Infra' })).toBeInTheDocument();
+  });
+
+  it('shows a retryable error when the first folder page fails', async () => {
+    const callCount = failFirstCall(FOLDER_SEARCH_URL, {
+      items: [folderItem('folder-1', 'Team Alerts')],
+      metadata: {},
+    });
+    const { user } = render(<AlertRulesPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load folders');
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByRole('link', { name: 'Team Alerts' })).toBeInTheDocument();
+    expect(callCount()).toBe(2);
+  });
+
+  it('switches to List for free text, keeps the folder filter, and disables Folders until it is cleared', async () => {
+    mockFolderSearch(() => ({ items: [folderItem('folder-1', 'Team Alerts')], metadata: {} }));
+    const { user } = render(<AlertRulesPage />, { historyOptions: { initialEntries: ['/?search=folder%3Afolder-1'] } });
+    await screen.findByRole('link', { name: 'Team Alerts' });
+
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), ' cpu{Enter}');
+
+    expect(await screen.findByRole('link', { name: 'CPU high' })).toBeInTheDocument();
+    expect(viewParam()).toBe('list');
+    expect(ruleSearchBodies.at(-1)?.where).toEqual({
+      and: [{ text: { value: 'cpu' } }, { filter: { field: 'folder', operator: 'In', values: ['folder-1'] } }],
+    });
+    expect(screen.getByRole('radio', { name: 'List' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Folders' })).toBeDisabled();
+
+    await user.hover(screen.getByRole('radio', { name: 'Folders' }).closest('div')!);
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Clear filters to browse by folder');
+  });
+
+  it('switches between Folders and List with the toggle, writing the view to the URL', async () => {
+    mockFolderSearch(() => ({ items: [folderItem('folder-1', 'Team Alerts')], metadata: {} }));
+    const { user } = render(<AlertRulesPage />);
+    await screen.findByRole('link', { name: 'Team Alerts' });
+
+    await user.click(screen.getByRole('radio', { name: 'List' }));
+
+    expect(await screen.findByRole('link', { name: 'CPU high' })).toBeInTheDocument();
+    expect(viewParam()).toBe('list');
+    expect(ruleSearchBodies.map((body) => body.where)).toEqual([undefined]);
+
+    await user.click(screen.getByRole('radio', { name: 'Folders' }));
+
+    expect(await screen.findByRole('link', { name: 'Team Alerts' })).toBeInTheDocument();
+    expect(viewParam()).toBeNull();
+  });
+
+  it('issues no folder-count requests in List mode', async () => {
+    let countRequests = 0;
+    server.use(
+      http.get(FOLDER_COUNTS_URL, () => {
+        countRequests += 1;
+        return HttpResponse.json({ counts: [] });
+      })
+    );
+
+    renderInListMode();
+
+    expect(await screen.findByText('CPU high')).toBeInTheDocument();
+    expect(countRequests).toBe(0);
   });
 });
